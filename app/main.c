@@ -12,7 +12,7 @@
 #define MAX_INPUT 100
 #define MAX_ARGS 10
 
-// Function to parse input with single quotes
+// Function to parse input with single and double quotes
 int parse_arguments(char *input, char *args[]) {
     int i = 0;
     char *ptr = input;
@@ -22,21 +22,47 @@ int parse_arguments(char *input, char *args[]) {
         if (*ptr == '\0') break;
 
         if (*ptr == '\'') {
-            ptr++; // Skip the opening quote
+            ptr++; // Skip the opening single quote
             args[i++] = ptr;
-            // Find the closing quote
+            // Find the closing single quote
             while (*ptr != '\'' && *ptr != '\0') ptr++;
             if (*ptr == '\0') {
-                // Handle unmatched quote
                 fprintf(stderr, "Error: unmatched single quote\n");
                 return -1;
             }
             *ptr = '\0'; // Terminate the argument
-            ptr++; // Move past the closing quote
-        } else {
+            ptr++; // Move past the closing single quote
+        }
+        else if (*ptr == '\"') {
+            ptr++; // Skip the opening double quote
             args[i++] = ptr;
-            // Find the next space
-            while (*ptr != ' ' && *ptr != '\0') ptr++;
+            char *arg_start = ptr;
+            while (*ptr != '\"' && *ptr != '\0') {
+                if (*ptr == '\\') {
+                    // Handle escape characters
+                    ptr++;
+                    if (*ptr == '\"' || *ptr == '\\' || *ptr == '$' || *ptr == '\n') {
+                        // Move the escaped character
+                        memmove(ptr - 1, ptr, strlen(ptr) + 1);
+                    }
+                    else {
+                        // Keep the backslash for other characters
+                        ptr--;
+                    }
+                }
+                ptr++;
+            }
+            if (*ptr == '\0') {
+                fprintf(stderr, "Error: unmatched double quote\n");
+                return -1;
+            }
+            *ptr = '\0'; // Terminate the argument
+            ptr++; // Move past the closing double quote
+        }
+        else {
+            args[i++] = ptr;
+            // Find the next space or quote
+            while (*ptr != ' ' && *ptr != '\'' && *ptr != '\"' && *ptr != '\0') ptr++;
             if (*ptr != '\0') {
                 *ptr = '\0';
                 ptr++;
@@ -58,7 +84,7 @@ int main() {
         if (fgets(input, sizeof(input), stdin) != NULL) { // Read user input
             input[strcspn(input, "\n")] = '\0'; // Remove trailing newline
 
-            // Parse input into arguments handling single quotes
+            // Parse input into arguments handling single and double quotes
             if (parse_arguments(input, args) != 0) {
                 continue; // Skip to next loop iteration on parse error
             }
@@ -146,7 +172,7 @@ int main() {
             // Handle 'cd' command
             if (args[0] != NULL && strcmp(args[0], "cd") == 0) {
                 if (args[1] != NULL) {
-                    // Check if the argument is '~'
+                    // Handle '~' character
                     if (strcmp(args[1], "~") == 0) {
                         char *home = getenv("HOME");
                         if (home != NULL) {
@@ -168,15 +194,19 @@ int main() {
             }
 
             // External command execution
-            pid_t pid = fork();
+            pid_t pid = fork(); // Fork a child process
             if (pid == 0) {
+                // Child process attempts to execute the command
                 execvp(args[0], args);
+                // If execvp returns, there was an error
                 printf("%s: command not found\n", args[0]);
-                _exit(1);
+                _exit(1); // Exit child process
             } else if (pid > 0) {
+                // Parent process waits for the child to complete
                 int status;
                 waitpid(pid, &status, 0);
             } else {
+                // Handle fork failure
                 perror("fork");
             }
         }
