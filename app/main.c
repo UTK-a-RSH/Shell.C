@@ -343,7 +343,5 @@ int main() {
                 free(args[j]);
             }
         }
-
-        return 0;
     }
 }
