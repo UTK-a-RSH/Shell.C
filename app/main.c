@@ -16,15 +16,14 @@ int main() {
     char input[MAX_INPUT];
     char *args[MAX_ARGS];
     
-    while (1) { // 1. Create an infinite loop for the REPL
-        printf("$ "); // 2. Display the prompt
+    while (1) { // Infinite loop for the REPL
+        printf("$ "); // Display the prompt
         fflush(stdout); // Ensure the prompt is shown immediately
 
-        if (fgets(input, sizeof(input), stdin) != NULL) { // 3. Read user input
-            // 4. Remove trailing newline
-            input[strcspn(input, "\n")] = '\0';
+        if (fgets(input, sizeof(input), stdin) != NULL) { // Read user input
+            input[strcspn(input, "\n")] = '\0'; // Remove trailing newline
 
-            // 5. Tokenize input into arguments
+            // Tokenize input into arguments
             int i = 0;
             char *token = strtok(input, " ");
             while (token != NULL && i < MAX_ARGS - 1) {
@@ -33,37 +32,34 @@ int main() {
             }
             args[i] = NULL; // Null-terminate the arguments array
 
-            // 6. Check for 'exit' command
+            // Handle 'exit' command
             if (args[0] != NULL && strcmp(args[0], "exit") == 0) {
-                int exit_status = 0; // Default exit status
+                int exit_status = 0;
                 if (args[1] != NULL) {
-                    exit_status = atoi(args[1]); // Convert argument to integer
+                    exit_status = atoi(args[1]);
                 }
-                exit(exit_status); // Terminate the shell with the specified status
+                exit(exit_status);
             }
 
-            // 7. Check for 'echo' command
+            // Handle 'echo' command
             if (args[0] != NULL && strcmp(args[0], "echo") == 0) {
-                // 8. Handle 'echo' by printing the arguments
                 for (int j = 1; args[j] != NULL; j++) {
                     printf("%s", args[j]);
                     if (args[j + 1] != NULL) {
                         printf(" ");
                     }
                 }
-                printf("\n"); // Newline after echo
-                continue; // Go back to the prompt
+                printf("\n");
+                continue;
             }
 
-            // 9. Check for 'type' command
+            // Handle 'type' command
             if (args[0] != NULL && strcmp(args[0], "type") == 0) {
-                if (args[1] != NULL) { // Ensure a command name is provided
-                    // 10. Updated list of shell builtins including 'cd'
+                if (args[1] != NULL) {
                     const char *builtins[] = {"pwd", "exit", "type", "echo", "cd"};
                     int is_builtin = 0;
-                    int num_builtins = sizeof(builtins) / sizeof(builtins[0]); // Calculate number of builtins
+                    int num_builtins = sizeof(builtins) / sizeof(builtins[0]);
 
-                    // 11. Iterate through builtins to check
                     for (int k = 0; k < num_builtins; k++) {
                         if (strcmp(args[1], builtins[k]) == 0) {
                             is_builtin = 1;
@@ -73,25 +69,21 @@ int main() {
                     if (is_builtin) {
                         printf("%s is a shell builtin\n", args[1]);
                     } else {
-                        // 12. Retrieve PATH environment variable
                         char *path_env = getenv("PATH");
                         if (path_env == NULL) {
                             printf("PATH not set\n");
                             continue;
                         }
 
-                        // 13. Duplicate PATH to avoid modifying the original
                         char path_copy[PATH_MAX];
                         strncpy(path_copy, path_env, PATH_MAX);
                         path_copy[PATH_MAX - 1] = '\0';
 
-                        // 14. Split PATH into directories
                         char *dir = strtok(path_copy, ":");
                         int found = 0;
                         while (dir != NULL) {
                             char full_path[PATH_MAX];
                             snprintf(full_path, sizeof(full_path), "%s/%s", dir, args[1]);
-                            // 15. Check if the file exists and is executable
                             if (access(full_path, X_OK) == 0) {
                                 printf("%s is %s\n", args[1], full_path);
                                 found = 1;
@@ -104,50 +96,58 @@ int main() {
                         }
                     }
                 } else {
-                    printf("type: missing argument\n"); // Handle missing argument
+                    printf("type: missing argument\n");
                 }
-                continue; // Go back to the prompt
+                continue;
             }
 
-           // 16. Check for 'pwd' command
-if (args[0] != NULL && strcmp(args[0], "pwd") == 0) {
-    char cwd[PATH_MAX];
-    if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        printf("%s\n", cwd);
-    } else {
-        perror("pwd");
-    }
-    continue; // Go back to the prompt
-}
+            // Handle 'pwd' command
+            if (args[0] != NULL && strcmp(args[0], "pwd") == 0) {
+                char cwd[PATH_MAX];
+                if (getcwd(cwd, sizeof(cwd)) != NULL) {
+                    printf("%s\n", cwd);
+                } else {
+                    perror("pwd");
+                }
+                continue;
+            }
 
-// 17. Check for 'cd' command
-if (args[0] != NULL && strcmp(args[0], "cd") == 0) {
-    if (args[1] != NULL) {
-        if (chdir(args[1]) != 0) {
-            printf("cd: %s: No such file or directory\n", args[1]);
-        }
-    } else {
-        printf("cd: missing argument\n");
-    }
-    continue; // Go back to the prompt
-}
+            // Handle 'cd' command
+            if (args[0] != NULL && strcmp(args[0], "cd") == 0) {
+                if (args[1] != NULL) {
+                    // Check if the argument is '~'
+                    if (strcmp(args[1], "~") == 0) {
+                        char *home = getenv("HOME");
+                        if (home != NULL) {
+                            if (chdir(home) != 0) {
+                                printf("cd: %s: No such file or directory\n", home);
+                            }
+                        } else {
+                            printf("cd: HOME not set\n");
+                        }
+                    } else {
+                        if (chdir(args[1]) != 0) {
+                            printf("cd: %s: No such file or directory\n", args[1]);
+                        }
+                    }
+                } else {
+                    printf("cd: missing argument\n");
+                }
+                continue; // Prevent external execution
+            }
 
-// External command execution
-pid_t pid = fork(); // 18. Fork a child process
-if (pid == 0) {
-    // 19. Child process attempts to execute the command
-    execvp(args[0], args);
-    // 20. If execvp returns, there was an error
-    printf("%s: command not found\n", args[0]);
-    _exit(1); // Exit child process
-} else if (pid > 0) {
-    // 21. Parent process waits for the child to complete
-    int status;
-    waitpid(pid, &status, 0);
-} else {
-    // 22. Handle fork failure
-    perror("fork");
-}
+            // External command execution
+            pid_t pid = fork();
+            if (pid == 0) {
+                execvp(args[0], args);
+                printf("%s: command not found\n", args[0]);
+                _exit(1);
+            } else if (pid > 0) {
+                int status;
+                waitpid(pid, &status, 0);
+            } else {
+                perror("fork");
+            }
         }
     }
     return 0;
