@@ -343,5 +343,7 @@ int main() {
                 free(args[j]);
             }
         }
+
+        return 0; // Ensures the shell runs indefinitely until 'exit' is called
     }
 }
