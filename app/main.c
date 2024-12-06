@@ -12,6 +12,41 @@
 #define MAX_INPUT 100
 #define MAX_ARGS 10
 
+// Function to parse input with single quotes
+int parse_arguments(char *input, char *args[]) {
+    int i = 0;
+    char *ptr = input;
+    while (*ptr != '\0' && i < MAX_ARGS - 1) {
+        // Skip leading spaces
+        while (*ptr == ' ') ptr++;
+        if (*ptr == '\0') break;
+
+        if (*ptr == '\'') {
+            ptr++; // Skip the opening quote
+            args[i++] = ptr;
+            // Find the closing quote
+            while (*ptr != '\'' && *ptr != '\0') ptr++;
+            if (*ptr == '\0') {
+                // Handle unmatched quote
+                fprintf(stderr, "Error: unmatched single quote\n");
+                return -1;
+            }
+            *ptr = '\0'; // Terminate the argument
+            ptr++; // Move past the closing quote
+        } else {
+            args[i++] = ptr;
+            // Find the next space
+            while (*ptr != ' ' && *ptr != '\0') ptr++;
+            if (*ptr != '\0') {
+                *ptr = '\0';
+                ptr++;
+            }
+        }
+    }
+    args[i] = NULL; // Null-terminate the arguments array
+    return 0;
+}
+
 int main() {
     char input[MAX_INPUT];
     char *args[MAX_ARGS];
@@ -23,14 +58,10 @@ int main() {
         if (fgets(input, sizeof(input), stdin) != NULL) { // Read user input
             input[strcspn(input, "\n")] = '\0'; // Remove trailing newline
 
-            // Tokenize input into arguments
-            int i = 0;
-            char *token = strtok(input, " ");
-            while (token != NULL && i < MAX_ARGS - 1) {
-                args[i++] = token;
-                token = strtok(NULL, " ");
+            // Parse input into arguments handling single quotes
+            if (parse_arguments(input, args) != 0) {
+                continue; // Skip to next loop iteration on parse error
             }
-            args[i] = NULL; // Null-terminate the arguments array
 
             // Handle 'exit' command
             if (args[0] != NULL && strcmp(args[0], "exit") == 0) {
