@@ -11,82 +11,100 @@
 
 #define MAX_INPUT 100
 #define MAX_ARGS 10
+#define ARG_BUFFER_SIZE 1024
 
 // Function to parse input with single and double quotes and handle backslashes
 int parse_arguments(char *input, char *args[]) {
-    int i = 0;             // Argument index
-    char *ptr = input;     // Pointer to traverse the input
+    int i = 0;                     // Argument index
+    char *ptr = input;             // Pointer to traverse the input
+    char arg_buffer[ARG_BUFFER_SIZE];
+    int arg_len = 0;
+    int in_single_quote = 0;
+    int in_double_quote = 0;
 
     while (*ptr != '\0' && i < MAX_ARGS - 1) {
         // Skip leading spaces
         while (*ptr == ' ') ptr++;
         if (*ptr == '\0') break;
 
-        if (*ptr == '\'') { // Handle single quotes
-            ptr++; // Skip the opening single quote
-            args[i++] = ptr; // Start of the argument
+        arg_len = 0;
+        memset(arg_buffer, 0, ARG_BUFFER_SIZE);
 
-            // Find the closing single quote
-            while (*ptr != '\'' && *ptr != '\0') ptr++;
-
-            if (*ptr == '\0') { // Unmatched single quote
-                fprintf(stderr, "Error: unmatched single quote\n");
-                return -1;
+        while (*ptr != '\0') {
+            if (in_single_quote) {
+                if (*ptr == '\'') {
+                    in_single_quote = 0;
+                    ptr++;
+                    break;
+                } else {
+                    if (arg_len < ARG_BUFFER_SIZE - 1)
+                        arg_buffer[arg_len++] = *ptr++;
+                }
             }
-
-            *ptr = '\0'; // Terminate the argument
-            ptr++; // Move past the closing single quote
-        }
-        else if (*ptr == '\"') { // Handle double quotes
-            ptr++; // Skip the opening double quote
-            args[i++] = ptr; // Start of the argument
-
-            while (*ptr != '\"' && *ptr != '\0') {
-                if (*ptr == '\\') { // Handle escape characters within double quotes
-                    ptr++; // Move past the backslash
+            else if (in_double_quote) {
+                if (*ptr == '\"') {
+                    in_double_quote = 0;
+                    ptr++;
+                    break;
+                }
+                else if (*ptr == '\\') {
+                    ptr++;
                     if (*ptr == '\"' || *ptr == '\\' || *ptr == '$' || *ptr == '\n') {
-                        // Overwrite the backslash with the escaped character
-                        memmove(ptr - 1, ptr, strlen(ptr) + 1);
+                        if (arg_len < ARG_BUFFER_SIZE - 1)
+                            arg_buffer[arg_len++] = *ptr++;
                     }
                     else {
-                        // Keep the backslash for other characters
-                        ptr--; // Revert to include the backslash as literal
+                        // Preserve the backslash
+                        if (arg_len < ARG_BUFFER_SIZE - 1)
+                            arg_buffer[arg_len++] = '\\';
                     }
                 }
-                ptr++;
+                else {
+                    if (arg_len < ARG_BUFFER_SIZE - 1)
+                        arg_buffer[arg_len++] = *ptr++;
+                }
             }
-
-            if (*ptr == '\0') { // Unmatched double quote
-                fprintf(stderr, "Error: unmatched double quote\n");
-                return -1;
-            }
-
-            *ptr = '\0'; // Terminate the argument
-            ptr++; // Move past the closing double quote
-        }
-        else { // Handle unquoted arguments with backslashes
-            args[i++] = ptr; // Start of the argument
-
-            while (*ptr != ' ' && *ptr != '\'' && *ptr != '\"' && *ptr != '\0') {
-                if (*ptr == '\\') { // Handle escape character
-                    ptr++; // Skip the backslash
-                    if (*ptr == '\0') { // Trailing backslash with no character to escape
+            else {
+                if (*ptr == '\'') {
+                    in_single_quote = 1;
+                    ptr++;
+                }
+                else if (*ptr == '\"') {
+                    in_double_quote = 1;
+                    ptr++;
+                }
+                else if (*ptr == '\\') {
+                    ptr++;
+                    if (*ptr == '\0') {
                         fprintf(stderr, "Error: trailing backslash\n");
                         return -1;
                     }
-                    // Overwrite the backslash with the escaped character
-                    memmove(ptr - 1, ptr, strlen(ptr) + 1);
+                    if (arg_len < ARG_BUFFER_SIZE - 1)
+                        arg_buffer[arg_len++] = *ptr++;
+                }
+                else if (*ptr == ' ') {
+                    ptr++;
+                    break;
                 }
                 else {
-                    ptr++;
+                    if (arg_len < ARG_BUFFER_SIZE - 1)
+                        arg_buffer[arg_len++] = *ptr++;
                 }
             }
-
-            if (*ptr != '\0') {
-                *ptr = '\0'; // Terminate the argument
-                ptr++;
-            }
         }
+
+        if (in_single_quote || in_double_quote) {
+            fprintf(stderr, "Error: unmatched %s quote\n", in_single_quote ? "single" : "double");
+            return -1;
+        }
+
+        arg_buffer[arg_len] = '\0';
+        args[i] = strdup(arg_buffer);
+        if (args[i] == NULL) {
+            perror("strdup");
+            return -1;
+        }
+        i++;
     }
 
     args[i] = NULL; // Null-terminate the arguments array
@@ -238,7 +256,12 @@ int main() {
                 // Handle fork failure
                 perror("fork");
             }
+
+            // Free allocated argument strings
+            for (int j = 0; args[j] != NULL; j++) {
+                free(args[j]);
+            }
         }
+        return 0;
     }
-    return 0;
 }
