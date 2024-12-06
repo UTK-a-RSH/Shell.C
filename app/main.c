@@ -353,6 +353,7 @@ int main() {
             }
         }
 
-        return 0; // Ensures the shell runs indefinitely until 'exit' is called
+         // Ensures the shell runs indefinitely until 'exit' is called
     }
+    return 0;
 }
