@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdlib.h> // Added for exit()
+#include <limits.h> // Added for PATH_MAX
 
 #define MAX_INPUT 100
 #define MAX_ARGS 10
@@ -66,7 +67,35 @@ int main() {
                     if (is_builtin) {
                         printf("%s is a shell builtin\n", args[1]);
                     } else {
-                        printf("%s: not found\n", args[1]);
+                        // 12. Retrieve PATH environment variable
+                        char *path_env = getenv("PATH");
+                        if (path_env == NULL) {
+                            printf("PATH not set\n");
+                            continue;
+                        }
+
+                        // 13. Duplicate PATH to avoid modifying the original
+                        char path_copy[PATH_MAX];
+                        strncpy(path_copy, path_env, PATH_MAX);
+                        path_copy[PATH_MAX - 1] = '\0';
+
+                        // 14. Split PATH into directories
+                        char *dir = strtok(path_copy, ":");
+                        int found = 0;
+                        while (dir != NULL) {
+                            char full_path[PATH_MAX];
+                            snprintf(full_path, sizeof(full_path), "%s/%s", dir, args[1]);
+                            // 15. Check if the file exists and is executable
+                            if (access(full_path, X_OK) == 0) {
+                                printf("%s is %s\n", args[1], full_path);
+                                found = 1;
+                                break;
+                            }
+                            dir = strtok(NULL, ":");
+                        }
+                        if (!found) {
+                            printf("%s: not found\n", args[1]);
+                        }
                     }
                 } else {
                     printf("type: missing argument\n"); // Handle missing argument
@@ -74,19 +103,19 @@ int main() {
                 continue; // Go back to the prompt
             }
 
-            pid_t pid = fork(); // 12. Fork a child process
+            pid_t pid = fork(); // 16. Fork a child process
             if (pid == 0) {
-                // 13. Child process attempts to execute the command
+                // 17. Child process attempts to execute the command
                 execvp(args[0], args);
-                // 14. If execvp returns, there was an error
+                // 18. If execvp returns, there was an error
                 printf("%s: command not found\n", args[0]);
                 _exit(1); // Exit child process
             } else if (pid > 0) {
-                // 15. Parent process waits for the child to complete
+                // 19. Parent process waits for the child to complete
                 int status;
                 waitpid(pid, &status, 0);
             } else {
-                // 16. Handle fork failure
+                // 20. Handle fork failure
                 perror("fork");
             }
         }
