@@ -58,11 +58,13 @@ int main() {
             // 9. Check for 'type' command
             if (args[0] != NULL && strcmp(args[0], "type") == 0) {
                 if (args[1] != NULL) { // Ensure a command name is provided
-                    // 10. List of shell builtins
-                    const char *builtins[] = {"echo", "exit", "type"};
+                    // 10. Updated list of shell builtins including 'pwd'
+                    const char *builtins[] = {"pwd", "exit", "type", "echo"};
                     int is_builtin = 0;
+                    int num_builtins = sizeof(builtins) / sizeof(builtins[0]); // Calculate number of builtins
+
                     // 11. Iterate through builtins to check
-                    for (int k = 0; k < 3; k++) {
+                    for (int k = 0; k < num_builtins; k++) {
                         if (strcmp(args[1], builtins[k]) == 0) {
                             is_builtin = 1;
                             break;
