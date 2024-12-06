@@ -5,6 +5,10 @@
 #include <stdlib.h> // Added for exit()
 #include <limits.h> // Added for PATH_MAX
 
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
 #define MAX_INPUT 100
 #define MAX_ARGS 10
 
@@ -103,19 +107,30 @@ int main() {
                 continue; // Go back to the prompt
             }
 
-            pid_t pid = fork(); // 16. Fork a child process
+            // 16. Check for 'pwd' command
+            if (args[0] != NULL && strcmp(args[0], "pwd") == 0) {
+                char cwd[PATH_MAX];
+                if (getcwd(cwd, sizeof(cwd)) != NULL) {
+                    printf("%s\n", cwd);
+                } else {
+                    perror("pwd");
+                }
+                continue; // Go back to the prompt
+            }
+
+            pid_t pid = fork(); // 17. Fork a child process
             if (pid == 0) {
-                // 17. Child process attempts to execute the command
+                // 18. Child process attempts to execute the command
                 execvp(args[0], args);
-                // 18. If execvp returns, there was an error
+                // 19. If execvp returns, there was an error
                 printf("%s: command not found\n", args[0]);
                 _exit(1); // Exit child process
             } else if (pid > 0) {
-                // 19. Parent process waits for the child to complete
+                // 20. Parent process waits for the child to complete
                 int status;
                 waitpid(pid, &status, 0);
             } else {
-                // 20. Handle fork failure
+                // 21. Handle fork failure
                 perror("fork");
             }
         }
