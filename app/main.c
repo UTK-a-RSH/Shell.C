@@ -107,16 +107,16 @@ int main() {
                 continue; // Go back to the prompt
             }
 
-            // 16. Check for 'pwd' command
-            if (args[0] != NULL && strcmp(args[0], "pwd") == 0) {
-                char cwd[PATH_MAX];
-                if (getcwd(cwd, sizeof(cwd)) != NULL) {
-                    printf("%s\n", cwd);
-                } else {
-                    perror("pwd");
-                }
-                continue; // Go back to the prompt
-            }
+           // 16. Check for 'pwd' command
+if (args[0] != NULL && strcmp(args[0], "pwd") == 0) {
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        printf("%s\n", cwd);
+    } else {
+        perror("pwd");
+    }
+    continue; // Go back to the prompt
+}
 
             pid_t pid = fork(); // 17. Fork a child process
             if (pid == 0) {
