@@ -4,6 +4,8 @@
 #include <sys/wait.h>
 #include <stdlib.h> // For exit()
 #include <limits.h> // For PATH_MAX
+#include <errno.h>
+
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
@@ -214,7 +216,7 @@ int main() {
                     }
                     else {
                         if (chdir(args[1]) != 0) {
-                            perror("cd");
+                            fprintf(stderr, "cd: %s: %s\n", args[1], strerror(errno));
                         }
                     }
                 }
