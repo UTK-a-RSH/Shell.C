@@ -12,63 +12,83 @@
 #define MAX_INPUT 100
 #define MAX_ARGS 10
 
-// Function to parse input with single and double quotes
+// Function to parse input with single and double quotes and handle backslashes
 int parse_arguments(char *input, char *args[]) {
-    int i = 0;
-    char *ptr = input;
+    int i = 0;             // Argument index
+    char *ptr = input;     // Pointer to traverse the input
+
     while (*ptr != '\0' && i < MAX_ARGS - 1) {
         // Skip leading spaces
         while (*ptr == ' ') ptr++;
         if (*ptr == '\0') break;
 
-        if (*ptr == '\'') {
+        if (*ptr == '\'') { // Handle single quotes
             ptr++; // Skip the opening single quote
-            args[i++] = ptr;
+            args[i++] = ptr; // Start of the argument
+
             // Find the closing single quote
             while (*ptr != '\'' && *ptr != '\0') ptr++;
-            if (*ptr == '\0') {
+
+            if (*ptr == '\0') { // Unmatched single quote
                 fprintf(stderr, "Error: unmatched single quote\n");
                 return -1;
             }
+
             *ptr = '\0'; // Terminate the argument
             ptr++; // Move past the closing single quote
         }
-        else if (*ptr == '\"') {
+        else if (*ptr == '\"') { // Handle double quotes
             ptr++; // Skip the opening double quote
-            args[i++] = ptr;
-            char *arg_start = ptr;
+            args[i++] = ptr; // Start of the argument
+
             while (*ptr != '\"' && *ptr != '\0') {
-                if (*ptr == '\\') {
-                    // Handle escape characters
-                    ptr++;
+                if (*ptr == '\\') { // Handle escape characters within double quotes
+                    ptr++; // Move past the backslash
                     if (*ptr == '\"' || *ptr == '\\' || *ptr == '$' || *ptr == '\n') {
-                        // Move the escaped character
+                        // Overwrite the backslash with the escaped character
                         memmove(ptr - 1, ptr, strlen(ptr) + 1);
                     }
                     else {
                         // Keep the backslash for other characters
-                        ptr--;
+                        ptr--; // Revert to include the backslash as literal
                     }
                 }
                 ptr++;
             }
-            if (*ptr == '\0') {
+
+            if (*ptr == '\0') { // Unmatched double quote
                 fprintf(stderr, "Error: unmatched double quote\n");
                 return -1;
             }
+
             *ptr = '\0'; // Terminate the argument
             ptr++; // Move past the closing double quote
         }
-        else {
-            args[i++] = ptr;
-            // Find the next space or quote
-            while (*ptr != ' ' && *ptr != '\'' && *ptr != '\"' && *ptr != '\0') ptr++;
+        else { // Handle unquoted arguments with backslashes
+            args[i++] = ptr; // Start of the argument
+
+            while (*ptr != ' ' && *ptr != '\'' && *ptr != '\"' && *ptr != '\0') {
+                if (*ptr == '\\') { // Handle escape character
+                    ptr++; // Skip the backslash
+                    if (*ptr == '\0') { // Trailing backslash with no character to escape
+                        fprintf(stderr, "Error: trailing backslash\n");
+                        return -1;
+                    }
+                    // Overwrite the backslash with the escaped character
+                    memmove(ptr - 1, ptr, strlen(ptr) + 1);
+                }
+                else {
+                    ptr++;
+                }
+            }
+
             if (*ptr != '\0') {
-                *ptr = '\0';
+                *ptr = '\0'; // Terminate the argument
                 ptr++;
             }
         }
     }
+
     args[i] = NULL; // Null-terminate the arguments array
     return 0;
 }
@@ -76,7 +96,7 @@ int parse_arguments(char *input, char *args[]) {
 int main() {
     char input[MAX_INPUT];
     char *args[MAX_ARGS];
-    
+
     while (1) { // Infinite loop for the REPL
         printf("$ "); // Display the prompt
         fflush(stdout); // Ensure the prompt is shown immediately
@@ -84,7 +104,7 @@ int main() {
         if (fgets(input, sizeof(input), stdin) != NULL) { // Read user input
             input[strcspn(input, "\n")] = '\0'; // Remove trailing newline
 
-            // Parse input into arguments handling single and double quotes
+            // Parse input into arguments handling single and double quotes and backslashes
             if (parse_arguments(input, args) != 0) {
                 continue; // Skip to next loop iteration on parse error
             }
@@ -123,9 +143,11 @@ int main() {
                             break;
                         }
                     }
+
                     if (is_builtin) {
                         printf("%s is a shell builtin\n", args[1]);
-                    } else {
+                    }
+                    else {
                         char *path_env = getenv("PATH");
                         if (path_env == NULL) {
                             printf("PATH not set\n");
@@ -152,8 +174,9 @@ int main() {
                             printf("%s: not found\n", args[1]);
                         }
                     }
-                } else {
-                    printf("type: missing argument\n");
+                }
+                else {
+                    printf("type: missing argument\n"); // Handle missing argument
                 }
                 continue;
             }
@@ -163,7 +186,8 @@ int main() {
                 char cwd[PATH_MAX];
                 if (getcwd(cwd, sizeof(cwd)) != NULL) {
                     printf("%s\n", cwd);
-                } else {
+                }
+                else {
                     perror("pwd");
                 }
                 continue;
@@ -179,15 +203,18 @@ int main() {
                             if (chdir(home) != 0) {
                                 printf("cd: %s: No such file or directory\n", home);
                             }
-                        } else {
+                        }
+                        else {
                             printf("cd: HOME not set\n");
                         }
-                    } else {
+                    }
+                    else {
                         if (chdir(args[1]) != 0) {
                             printf("cd: %s: No such file or directory\n", args[1]);
                         }
                     }
-                } else {
+                }
+                else {
                     printf("cd: missing argument\n");
                 }
                 continue; // Prevent external execution
@@ -201,11 +228,13 @@ int main() {
                 // If execvp returns, there was an error
                 printf("%s: command not found\n", args[0]);
                 _exit(1); // Exit child process
-            } else if (pid > 0) {
+            }
+            else if (pid > 0) {
                 // Parent process waits for the child to complete
                 int status;
                 waitpid(pid, &status, 0);
-            } else {
+            }
+            else {
                 // Handle fork failure
                 perror("fork");
             }
