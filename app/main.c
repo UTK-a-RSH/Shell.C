@@ -2,109 +2,166 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
-#include <stdlib.h> // Added for exit()
-#include <limits.h> // Added for PATH_MAX
+#include <stdlib.h> // For exit()
+#include <limits.h> // For PATH_MAX
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
 
-#define MAX_INPUT 100
-#define MAX_ARGS 10
+#define MAX_INPUT 1024
+#define MAX_ARGS 100
 #define ARG_BUFFER_SIZE 1024
+
+typedef enum {
+    STATE_DEFAULT,
+    STATE_IN_SINGLE_QUOTE,
+    STATE_IN_DOUBLE_QUOTE,
+    STATE_ESCAPE_DEFAULT,
+    STATE_ESCAPE_DOUBLE_QUOTE
+} parser_state_t;
 
 // Function to parse input with single and double quotes and handle backslashes
 int parse_arguments(char *input, char *args[]) {
     int i = 0;                     // Argument index
-    char *ptr = input;             // Pointer to traverse the input
+    int len = strlen(input);
+    parser_state_t state = STATE_DEFAULT;
     char arg_buffer[ARG_BUFFER_SIZE];
     int arg_len = 0;
-    int in_single_quote = 0;
-    int in_double_quote = 0;
 
-    while (*ptr != '\0' && i < MAX_ARGS - 1) {
-        // Skip leading spaces
-        while (*ptr == ' ') ptr++;
-        if (*ptr == '\0') break;
+    for (int pos = 0; pos < len; pos++) {
+        char c = input[pos];
 
-        arg_len = 0;
-        memset(arg_buffer, 0, ARG_BUFFER_SIZE);
-
-        while (*ptr != '\0') {
-            if (in_single_quote) {
-                if (*ptr == '\'') {
-                    in_single_quote = 0;
-                    ptr++;
-                    break;
-                } else {
-                    if (arg_len < ARG_BUFFER_SIZE - 1)
-                        arg_buffer[arg_len++] = *ptr++;
-                }
-            }
-            else if (in_double_quote) {
-                if (*ptr == '\"') {
-                    in_double_quote = 0;
-                    ptr++;
-                    break;
-                }
-                else if (*ptr == '\\') {
-                    ptr++;
-                    if (*ptr == '\"' || *ptr == '\\' || *ptr == '$' || *ptr == '\n') {
-                        if (arg_len < ARG_BUFFER_SIZE - 1)
-                            arg_buffer[arg_len++] = *ptr++;
+        switch (state) {
+            case STATE_DEFAULT:
+                if (c == ' ') {
+                    if (arg_len > 0) {
+                        arg_buffer[arg_len] = '\0';
+                        args[i++] = strdup(arg_buffer);
+                        if (args[i-1] == NULL) {
+                            perror("strdup");
+                            return -1;
+                        }
+                        arg_len = 0;
+                        if (i >= MAX_ARGS - 1) {
+                            fprintf(stderr, "Error: too many arguments\n");
+                            return -1;
+                        }
                     }
-                    else {
-                        // Preserve the backslash
-                        if (arg_len < ARG_BUFFER_SIZE - 1)
-                            arg_buffer[arg_len++] = '\\';
-                    }
+                    // Else, skip multiple spaces
+                }
+                else if (c == '\'') {
+                    state = STATE_IN_SINGLE_QUOTE;
+                }
+                else if (c == '\"') {
+                    state = STATE_IN_DOUBLE_QUOTE;
+                }
+                else if (c == '\\') {
+                    state = STATE_ESCAPE_DEFAULT;
                 }
                 else {
                     if (arg_len < ARG_BUFFER_SIZE - 1)
-                        arg_buffer[arg_len++] = *ptr++;
-                }
-            }
-            else {
-                if (*ptr == '\'') {
-                    in_single_quote = 1;
-                    ptr++;
-                }
-                else if (*ptr == '\"') {
-                    in_double_quote = 1;
-                    ptr++;
-                }
-                else if (*ptr == '\\') {
-                    ptr++;
-                    if (*ptr == '\0') {
-                        fprintf(stderr, "Error: trailing backslash\n");
+                        arg_buffer[arg_len++] = c;
+                    else {
+                        fprintf(stderr, "Error: argument too long\n");
                         return -1;
                     }
-                    if (arg_len < ARG_BUFFER_SIZE - 1)
-                        arg_buffer[arg_len++] = *ptr++;
                 }
-                else if (*ptr == ' ') {
-                    ptr++;
-                    break;
+                break;
+
+            case STATE_IN_SINGLE_QUOTE:
+                if (c == '\'') {
+                    state = STATE_DEFAULT;
                 }
                 else {
                     if (arg_len < ARG_BUFFER_SIZE - 1)
-                        arg_buffer[arg_len++] = *ptr++;
+                        arg_buffer[arg_len++] = c;
+                    else {
+                        fprintf(stderr, "Error: argument too long\n");
+                        return -1;
+                    }
                 }
-            }
-        }
+                break;
 
-        if (in_single_quote || in_double_quote) {
-            fprintf(stderr, "Error: unmatched %s quote\n", in_single_quote ? "single" : "double");
-            return -1;
-        }
+            case STATE_IN_DOUBLE_QUOTE:
+                if (c == '\"') {
+                    state = STATE_DEFAULT;
+                }
+                else if (c == '\\') {
+                    state = STATE_ESCAPE_DOUBLE_QUOTE;
+                }
+                else {
+                    if (arg_len < ARG_BUFFER_SIZE - 1)
+                        arg_buffer[arg_len++] = c;
+                    else {
+                        fprintf(stderr, "Error: argument too long\n");
+                        return -1;
+                    }
+                }
+                break;
 
+            case STATE_ESCAPE_DEFAULT:
+                if (c == '\0') {
+                    fprintf(stderr, "Error: trailing backslash\n");
+                    return -1;
+                }
+                else {
+                    if (arg_len < ARG_BUFFER_SIZE - 1)
+                        arg_buffer[arg_len++] = c;
+                    else {
+                        fprintf(stderr, "Error: argument too long\n");
+                        return -1;
+                    }
+                    state = STATE_DEFAULT;
+                }
+                break;
+
+            case STATE_ESCAPE_DOUBLE_QUOTE:
+                if (c == '\"' || c == '\\' || c == '$' || c == '`') {
+                    if (arg_len < ARG_BUFFER_SIZE - 1)
+                        arg_buffer[arg_len++] = c;
+                    else {
+                        fprintf(stderr, "Error: argument too long\n");
+                        return -1;
+                    }
+                }
+                else {
+                    // Backslash remains
+                    if (arg_len < ARG_BUFFER_SIZE - 1)
+                        arg_buffer[arg_len++] = '\\';
+                    if (arg_len < ARG_BUFFER_SIZE - 1)
+                        arg_buffer[arg_len++] = c;
+                    else {
+                        fprintf(stderr, "Error: argument too long\n");
+                        return -1;
+                    }
+                }
+                state = STATE_IN_DOUBLE_QUOTE;
+                break;
+        }
+    }
+
+    // End of input processing
+    if (state == STATE_IN_SINGLE_QUOTE) {
+        fprintf(stderr, "Error: unmatched single quote\n");
+        return -1;
+    }
+    if (state == STATE_IN_DOUBLE_QUOTE) {
+        fprintf(stderr, "Error: unmatched double quote\n");
+        return -1;
+    }
+    if (state == STATE_ESCAPE_DEFAULT || state == STATE_ESCAPE_DOUBLE_QUOTE) {
+        fprintf(stderr, "Error: trailing backslash\n");
+        return -1;
+    }
+
+    if (arg_len > 0) {
         arg_buffer[arg_len] = '\0';
-        args[i] = strdup(arg_buffer);
-        if (args[i] == NULL) {
+        args[i++] = strdup(arg_buffer);
+        if (args[i-1] == NULL) {
             perror("strdup");
             return -1;
         }
-        i++;
     }
 
     args[i] = NULL; // Null-terminate the arguments array
@@ -133,6 +190,10 @@ int main() {
                 if (args[1] != NULL) {
                     exit_status = atoi(args[1]);
                 }
+                // Free allocated memory before exiting
+                for (int j = 0; args[j] != NULL; j++) {
+                    free(args[j]);
+                }
                 exit(exit_status);
             }
 
@@ -145,6 +206,10 @@ int main() {
                     }
                 }
                 printf("\n");
+                // Free allocated memory
+                for (int j = 0; args[j] != NULL; j++) {
+                    free(args[j]);
+                }
                 continue;
             }
 
@@ -169,11 +234,15 @@ int main() {
                         char *path_env = getenv("PATH");
                         if (path_env == NULL) {
                             printf("PATH not set\n");
+                            // Free allocated memory
+                            for (int j = 0; args[j] != NULL; j++) {
+                                free(args[j]);
+                            }
                             continue;
                         }
 
                         char path_copy[PATH_MAX];
-                        strncpy(path_copy, path_env, PATH_MAX);
+                        strncpy(path_copy, path_env, PATH_MAX - 1);
                         path_copy[PATH_MAX - 1] = '\0';
 
                         char *dir = strtok(path_copy, ":");
@@ -196,6 +265,10 @@ int main() {
                 else {
                     printf("type: missing argument\n"); // Handle missing argument
                 }
+                // Free allocated memory
+                for (int j = 0; args[j] != NULL; j++) {
+                    free(args[j]);
+                }
                 continue;
             }
 
@@ -207,6 +280,10 @@ int main() {
                 }
                 else {
                     perror("pwd");
+                }
+                // Free allocated memory
+                for (int j = 0; args[j] != NULL; j++) {
+                    free(args[j]);
                 }
                 continue;
             }
@@ -235,6 +312,10 @@ int main() {
                 else {
                     printf("cd: missing argument\n");
                 }
+                // Free allocated memory
+                for (int j = 0; args[j] != NULL; j++) {
+                    free(args[j]);
+                }
                 continue; // Prevent external execution
             }
 
@@ -262,6 +343,7 @@ int main() {
                 free(args[j]);
             }
         }
+
         return 0;
     }
 }
