@@ -2,6 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <stdlib.h> // Added for exit()
 
 #define MAX_INPUT 100
 #define MAX_ARGS 10
@@ -27,19 +28,28 @@ int main() {
             }
             args[i] = NULL; // Null-terminate the arguments array
 
-            pid_t pid = fork(); // 6. Fork a child process
+            // 6. Check for 'exit' command
+            if (args[0] != NULL && strcmp(args[0], "exit") == 0) {
+                int exit_status = 0; // Default exit status
+                if (args[1] != NULL) {
+                    exit_status = atoi(args[1]); // Convert argument to integer
+                }
+                exit(exit_status); // Terminate the shell with the specified status
+            }
+
+            pid_t pid = fork(); // 7. Fork a child process
             if (pid == 0) {
-                // 7. Child process attempts to execute the command
+                // 8. Child process attempts to execute the command
                 execvp(args[0], args);
-                // 8. If execvp returns, there was an error
+                // 9. If execvp returns, there was an error
                 printf("%s: command not found\n", args[0]);
                 _exit(1); // Exit child process
             } else if (pid > 0) {
-                // 9. Parent process waits for the child to complete
+                // 10. Parent process waits for the child to complete
                 int status;
                 waitpid(pid, &status, 0);
             } else {
-                // Handle fork failure
+                // 11. Handle fork failure
                 perror("fork");
             }
         }
