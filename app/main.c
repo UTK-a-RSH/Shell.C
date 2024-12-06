@@ -58,8 +58,8 @@ int main() {
             // 9. Check for 'type' command
             if (args[0] != NULL && strcmp(args[0], "type") == 0) {
                 if (args[1] != NULL) { // Ensure a command name is provided
-                    // 10. Updated list of shell builtins including 'pwd'
-                    const char *builtins[] = {"pwd", "exit", "type", "echo"};
+                    // 10. Updated list of shell builtins including 'cd'
+                    const char *builtins[] = {"pwd", "exit", "type", "echo", "cd"};
                     int is_builtin = 0;
                     int num_builtins = sizeof(builtins) / sizeof(builtins[0]); // Calculate number of builtins
 
@@ -120,21 +120,34 @@ if (args[0] != NULL && strcmp(args[0], "pwd") == 0) {
     continue; // Go back to the prompt
 }
 
-            pid_t pid = fork(); // 17. Fork a child process
-            if (pid == 0) {
-                // 18. Child process attempts to execute the command
-                execvp(args[0], args);
-                // 19. If execvp returns, there was an error
-                printf("%s: command not found\n", args[0]);
-                _exit(1); // Exit child process
-            } else if (pid > 0) {
-                // 20. Parent process waits for the child to complete
-                int status;
-                waitpid(pid, &status, 0);
-            } else {
-                // 21. Handle fork failure
-                perror("fork");
-            }
+// 17. Check for 'cd' command
+if (args[0] != NULL && strcmp(args[0], "cd") == 0) {
+    if (args[1] != NULL) {
+        if (chdir(args[1]) != 0) {
+            printf("cd: %s: No such file or directory\n", args[1]);
+        }
+    } else {
+        printf("cd: missing argument\n");
+    }
+    continue; // Go back to the prompt
+}
+
+// External command execution
+pid_t pid = fork(); // 18. Fork a child process
+if (pid == 0) {
+    // 19. Child process attempts to execute the command
+    execvp(args[0], args);
+    // 20. If execvp returns, there was an error
+    printf("%s: command not found\n", args[0]);
+    _exit(1); // Exit child process
+} else if (pid > 0) {
+    // 21. Parent process waits for the child to complete
+    int status;
+    waitpid(pid, &status, 0);
+} else {
+    // 22. Handle fork failure
+    perror("fork");
+}
         }
     }
     return 0;
