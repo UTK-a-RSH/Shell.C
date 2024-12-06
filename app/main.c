@@ -50,19 +50,43 @@ int main() {
                 continue; // Go back to the prompt
             }
 
-            pid_t pid = fork(); // 9. Fork a child process
+            // 9. Check for 'type' command
+            if (args[0] != NULL && strcmp(args[0], "type") == 0) {
+                if (args[1] != NULL) { // Ensure a command name is provided
+                    // 10. List of shell builtins
+                    const char *builtins[] = {"echo", "exit", "type"};
+                    int is_builtin = 0;
+                    // 11. Iterate through builtins to check
+                    for (int k = 0; k < 3; k++) {
+                        if (strcmp(args[1], builtins[k]) == 0) {
+                            is_builtin = 1;
+                            break;
+                        }
+                    }
+                    if (is_builtin) {
+                        printf("%s is a shell builtin\n", args[1]);
+                    } else {
+                        printf("%s: not found\n", args[1]);
+                    }
+                } else {
+                    printf("type: missing argument\n"); // Handle missing argument
+                }
+                continue; // Go back to the prompt
+            }
+
+            pid_t pid = fork(); // 12. Fork a child process
             if (pid == 0) {
-                // 10. Child process attempts to execute the command
+                // 13. Child process attempts to execute the command
                 execvp(args[0], args);
-                // 11. If execvp returns, there was an error
+                // 14. If execvp returns, there was an error
                 printf("%s: command not found\n", args[0]);
                 _exit(1); // Exit child process
             } else if (pid > 0) {
-                // 12. Parent process waits for the child to complete
+                // 15. Parent process waits for the child to complete
                 int status;
                 waitpid(pid, &status, 0);
             } else {
-                // 13. Handle fork failure
+                // 16. Handle fork failure
                 perror("fork");
             }
         }
