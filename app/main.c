@@ -37,19 +37,32 @@ int main() {
                 exit(exit_status); // Terminate the shell with the specified status
             }
 
-            pid_t pid = fork(); // 7. Fork a child process
+            // 7. Check for 'echo' command
+            if (args[0] != NULL && strcmp(args[0], "echo") == 0) {
+                // 8. Handle 'echo' by printing the arguments
+                for (int j = 1; args[j] != NULL; j++) {
+                    printf("%s", args[j]);
+                    if (args[j + 1] != NULL) {
+                        printf(" ");
+                    }
+                }
+                printf("\n"); // Newline after echo
+                continue; // Go back to the prompt
+            }
+
+            pid_t pid = fork(); // 9. Fork a child process
             if (pid == 0) {
-                // 8. Child process attempts to execute the command
+                // 10. Child process attempts to execute the command
                 execvp(args[0], args);
-                // 9. If execvp returns, there was an error
+                // 11. If execvp returns, there was an error
                 printf("%s: command not found\n", args[0]);
                 _exit(1); // Exit child process
             } else if (pid > 0) {
-                // 10. Parent process waits for the child to complete
+                // 12. Parent process waits for the child to complete
                 int status;
                 waitpid(pid, &status, 0);
             } else {
-                // 11. Handle fork failure
+                // 13. Handle fork failure
                 perror("fork");
             }
         }
