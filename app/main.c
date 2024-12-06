@@ -197,6 +197,137 @@ int main() {
                 exit(exit_status);
             }
 
+            // Handle 'cd' command
+            if (args[0] != NULL && strcmp(args[0], "cd") == 0) {
+                if (args[1] != NULL) {
+                    // Handle '~' character
+                    if (strcmp(args[1], "~") == 0) {
+                        char *home = getenv("HOME");
+                        if (home != NULL) {
+                            if (chdir(home) != 0) {
+                                perror("cd");
+                            }
+                        }
+                        else {
+                            fprintf(stderr, "cd: HOME not set\n");
+                        }
+                    }
+                    else {
+                        if (chdir(args[1]) != 0) {
+                            perror("cd");
+                        }
+                    }
+                }
+                else {
+                    // If no argument is provided, change to HOME directory
+                    char *home = getenv("HOME");
+                    if (home != NULL) {
+                        if (chdir(home) != 0) {
+                            perror("cd");
+                        }
+                    }
+                    else {
+                        fprintf(stderr, "cd: HOME not set\n");
+                    }
+                }
+                // Free allocated memory after built-in command
+                for (int j = 0; args[j] != NULL; j++) {
+                    free(args[j]);
+                }
+                continue; // Skip external command execution after handling built-in
+            }
+
+            // Handle 'echo' command
+            if (args[0] != NULL && strcmp(args[0], "echo") == 0) {
+                for (int j = 1; args[j] != NULL; j++) {
+                    printf("%s", args[j]);
+                    if (args[j + 1] != NULL) {
+                        printf(" ");
+                    }
+                }
+                printf("\n");
+                // Free allocated memory after built-in command
+                for (int j = 0; args[j] != NULL; j++) {
+                    free(args[j]);
+                }
+                continue; // Skip external command execution after handling built-in
+            }
+
+            // Handle 'type' command
+            if (args[0] != NULL && strcmp(args[0], "type") == 0) {
+                if (args[1] != NULL) {
+                    const char *builtins[] = {"pwd", "exit", "type", "echo", "cd"};
+                    int is_builtin = 0;
+                    int num_builtins = sizeof(builtins) / sizeof(builtins[0]);
+
+                    for (int k = 0; k < num_builtins; k++) {
+                        if (strcmp(args[1], builtins[k]) == 0) {
+                            is_builtin = 1;
+                            break;
+                        }
+                    }
+
+                    if (is_builtin) {
+                        printf("%s is a shell builtin\n", args[1]);
+                    }
+                    else {
+                        char *path_env = getenv("PATH");
+                        if (path_env == NULL) {
+                            printf("PATH not set\n");
+                            // Free allocated memory
+                            for (int j = 0; args[j] != NULL; j++) {
+                                free(args[j]);
+                            }
+                            continue;
+                        }
+
+                        char path_copy[PATH_MAX];
+                        strncpy(path_copy, path_env, PATH_MAX - 1);
+                        path_copy[PATH_MAX - 1] = '\0';
+
+                        char *dir = strtok(path_copy, ":");
+                        int found = 0;
+                        while (dir != NULL) {
+                            char full_path[PATH_MAX];
+                            snprintf(full_path, sizeof(full_path), "%s/%s", dir, args[1]);
+                            if (access(full_path, X_OK) == 0) {
+                                printf("%s is %s\n", args[1], full_path);
+                                found = 1;
+                                break;
+                            }
+                            dir = strtok(NULL, ":");
+                        }
+                        if (!found) {
+                            printf("%s: not found\n", args[1]);
+                        }
+                    }
+                }
+                else {
+                    printf("type: missing argument\n"); // Handle missing argument
+                }
+                // Free allocated memory after built-in command
+                for (int j = 0; args[j] != NULL; j++) {
+                    free(args[j]);
+                }
+                continue; // Skip external command execution after handling built-in
+            }
+
+            // Handle 'pwd' command
+            if (args[0] != NULL && strcmp(args[0], "pwd") == 0) {
+                char cwd[PATH_MAX];
+                if (getcwd(cwd, sizeof(cwd)) != NULL) {
+                    printf("%s\n", cwd);
+                }
+                else {
+                    perror("pwd");
+                }
+                // Free allocated memory after built-in command
+                for (int j = 0; args[j] != NULL; j++) {
+                    free(args[j]);
+                }
+                continue; // Skip external command execution after handling built-in
+            }
+
             // External command execution
             pid_t pid = fork(); // Fork a child process
             if (pid == 0) {
